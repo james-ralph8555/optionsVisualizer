@@ -11,7 +11,6 @@ from scipy import stats
 #parula_map = LinearSegmentedColormap.from_list('parula', parula())
 
 class option():
-    #dayOffset=1 means 1 day in future
     def __init__(self, otype, S0, K, marketPrice=None, T=None, expDay=None, vol=None, r=0.025):
         self.S0=S0
         self.K=K
