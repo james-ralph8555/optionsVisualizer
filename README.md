@@ -2,17 +2,9 @@
 
 WIP 
 
-todo:  
--add more greeks:  
-  Lambda (elasticity)  
-  Epsilon  
-  Vanna  
-  Charm  
-  Vomma  
-  Vega  
-  Color  
--add dividend yield  
+todo:
 -implement matlab engine in py code when matlab engine is updated to python 3.8  
--UI?  
+-UI
+-Plot with matplotlib option
 
 ![Demo](https://i.imgur.com/E5PQr3M.png)
