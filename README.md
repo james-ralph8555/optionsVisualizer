@@ -4,4 +4,4 @@ Equity options visualizer built in python with optional use of MATLAB for improv
 
 Heavily WIP but functional
 
-![Demo](https://i.imgur.com/ml3rXER.png)
+![Demo](https://i.imgur.com/E5PQr3M.png)
