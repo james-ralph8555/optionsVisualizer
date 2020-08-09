@@ -1,6 +1,6 @@
 # optionsVisualizer
 
-Heavily WIP but functional.
+WIP 
 
 todo:  
 -add more greeks:  
