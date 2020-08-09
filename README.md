@@ -3,7 +3,7 @@
 Heavily WIP but functional.
 
 todo:  
-add more greeks:  
+-add more greeks:  
   Lambda (elasticity)  
   Epsilon  
   Vanna  
@@ -11,9 +11,8 @@ add more greeks:
   Vomma  
   Vega  
   Color  
-add dividend yield  
-implement Black model for options on futures  
-implement matlab engine in py code when matlab engine is updated to python 3.8  
-UI?  
+-add dividend yield  
+-implement matlab engine in py code when matlab engine is updated to python 3.8  
+-UI?  
 
 ![Demo](https://i.imgur.com/E5PQr3M.png)
