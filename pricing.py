@@ -76,7 +76,7 @@ class option():
         if self.otype == 'Call':
             return np.exp(-q*T)*stats.norm.cdf(d1)
         elif self.otype == 'Put':
-            return np.exp(-q*T)*stats.norm.cdf(-d1)
+            return -np.exp(-q*T)*stats.norm.cdf(-d1)
         
     def vega(self, S0=None, K=None, vol=None, r=None, T=None, q=0): #dV/dvol
         S0, K, vol, r, T, q = self.inpcheck(S0, K, vol, r, T, q)

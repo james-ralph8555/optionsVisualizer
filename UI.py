@@ -1,6 +1,12 @@
-from PyQt5.QtWidgets import * 
-from PyQt5.QtCore import Qt 
+from PyQt5.QtCore import QDateTime, Qt, QTimer
+from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDateTimeEdit,
+        QDial, QDialog, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+        QProgressBar, QPushButton, QRadioButton, QScrollBar, QSizePolicy,
+        QSlider, QSpinBox, QStyleFactory, QTableWidget, QTabWidget, QTextEdit,
+        QVBoxLayout, QWidget, QTableWidgetItem, QMessageBox, QFormLayout, QListWidget)
 from PyQt5.QtGui import * 
+
+from parula import parula
 
 import sys
 import time
@@ -11,6 +17,7 @@ from matplotlib.backends.qt_compat import QtCore, QtWidgets
 from matplotlib.backends.backend_qt5agg import (
         FigureCanvas, NavigationToolbar2QT as NavigationToolbar)
 from matplotlib.figure import Figure
+from matplotlib.colors import LinearSegmentedColormap
 
 from pricing import option
 
@@ -20,7 +27,7 @@ class BlackScholesUI(QDialog):
 
         self.originalPalette = QApplication.palette()
         
-        self.outputs = ['Price', 'delta', 'vega', 'theta', 'rho', 'omega',\
+        self.outputs = ['price', 'delta', 'vega', 'theta', 'rho', 'omega',\
                         'gamma', 'vanna', 'charm', 'vomma', 'veta', 'speed', \
                             'zomma', 'color', 'ultima', 'dualDelta', 'dualGamma']
             
@@ -40,20 +47,22 @@ class BlackScholesUI(QDialog):
         leftLayout.addWidget(self.greeksBox)
 
         rightLayout = QGridLayout()
-        rightLayout.addLayout(self.inputBox, 0, 0, 1, 3)
-        rightLayout.addWidget(self.outputSelectList, 1, 0, 5, 3)
+        rightLayout.addLayout(self.inputBox, 0, 0, 1, 4)
+        rightLayout.addWidget(self.outputSelectList, 1, 0, 5, 4)
+        MATLABButton = QPushButton("Export to MATLAB")
+        rightLayout.addWidget(MATLABButton, 6, 0, 1, 2)
+        plotButton = QPushButton("Plot Sweep Outputs")
+        rightLayout.addWidget(plotButton, 6, 2, 1, 2)
+        plotButton.clicked.connect(self.onPlotSweepButtonClicked)
         
         bottomLayout = QGridLayout()
-        bottomLayout.addWidget(self.optionsBox, 0, 0, 2, 7)
-        MATLABButton = QPushButton("Export to MATLAB")
-        bottomLayout.addWidget(MATLABButton, 2, 0, 3, 3)
-        plotButton = QPushButton("Plot Sweep Outputs")
-        bottomLayout.addWidget(plotButton, 2, 3, 3, 4)
+        bottomLayout.addWidget(self.optionsBox, 0, 0, 2, 4)
+        
         
         mainLayout = QGridLayout()
         mainLayout.addLayout(leftLayout, 0, 0, 3, 4)
         mainLayout.addLayout(rightLayout, 0, 9, 3, -1)
-        mainLayout.addLayout(bottomLayout, 3, 4, -1, 5)
+        mainLayout.addLayout(bottomLayout, 3, 0, -1, 4)
         mainLayout.addWidget(self.plotGroupBox, 0, 4, 3, 5)
         
         mainLayout.setColumnStretch(0, 1)
@@ -73,7 +82,7 @@ class BlackScholesUI(QDialog):
         QApplication.setStyle(QStyleFactory.create('Fusion'))
         
     def addOptionSelector(self):
-        self.optionsSelection = QGroupBox('Select')
+        self.optionsSelection = QGroupBox()
         addOptionButton = QPushButton("Add Option")
         addOptionButton.clicked.connect(self.onOptionsAddClicked) 
         self.optionsTypeBox = QComboBox()
@@ -249,26 +258,14 @@ class BlackScholesUI(QDialog):
                 QSizePolicy.Ignored)
         
         self.tab1 = FigureCanvas(Figure(figsize=(4, 8)))
-        self.timeEvolutionAx = self.tab1.figure.add_subplot(111)
+        self.plot1ax = self.tab1.figure.add_subplot(111)
 
-        tab2 = QWidget()
-        textEdit = QTextEdit()
-
-        textEdit.setPlainText("Twinkle, twinkle, little star,\n"
-                              "How I wonder what you are.\n"
-                              "Up above the world so high,\n"
-                              "Like a diamond in the sky.\n"
-                              "Twinkle, twinkle, little star,\n"
-                              "How I wonder what you are!\n")
-
-        tab2hbox = QHBoxLayout()
-        tab2hbox.setContentsMargins(5, 5, 5, 5)
-        tab2hbox.addWidget(textEdit)
-        tab2.setLayout(tab2hbox)
+        self.tab2 = FigureCanvas(Figure(figsize=(4, 8)))
+        self.plot2ax = self.tab2.figure.add_subplot(111)
         
         
         self.plotGroupBox.addTab(self.tab1, "&Time Evolution of Value")
-        self.plotGroupBox.addTab(tab2, "&Sweep Results")
+        self.plotGroupBox.addTab(self.tab2, "&Sweep Results")
         #self.plotGroupBox.addTab(tab3, "&Profit Calculator")
         #self.plotGroupBox.addTab(tab4, "&Delta Hedging")
     
@@ -279,7 +276,7 @@ class BlackScholesUI(QDialog):
         self.optionsTable.setItem(0, 1, QTableWidgetItem('Strike'))
         self.optionsTable.setItem(0, 2, QTableWidgetItem('Expiration'))
         self.optionsTable.setItem(0, 3, QTableWidgetItem('Underlying Price'))
-        #self.optionsTable.setSelectionMode(QtGui.QAbstractItemView.MultiSelection)
+        self.optionsTable.setSelectionMode(2)
         self.optionsTable.cellClicked.connect(self.onOptionTableClicked)
 
         layout = QHBoxLayout()
@@ -288,12 +285,14 @@ class BlackScholesUI(QDialog):
         self.optionsBox.setLayout(layout)
     
     def onOptionTableClicked(self, row, column):
-        selected = self.optionsTable.selectedItems()
+        self.selected = self.optionsTable.selectedItems()
         fulltime = []
         halftime = []
         expiry = []
-        for item in selected:
-            if item.row() != 0 and item.row()<=len(self.optionsList):
+        usedRows = []
+        for item in self.selected:
+            if item.row() != 0 and item.row()<=len(self.optionsList) and item.row() not in usedRows:
+                usedRows.append(item.row())
                 opt = self.optionsList[item.row()-1]
                 self.greeksTable.setItem(0, 1, QTableWidgetItem(str(opt.marketPrice)))
                 self.greeksTable.setItem(1, 1, QTableWidgetItem(str(opt.vol)))
@@ -317,22 +316,22 @@ class BlackScholesUI(QDialog):
                 self.greeksTable.setItem(8, 3, QTableWidgetItem(str(opt.dualDelta(S0=opt.S0, K=opt.K, vol=opt.vol, r=opt.r, T=opt.T, q=opt.q))))
                 self.greeksTable.setItem(9, 3, QTableWidgetItem(str(opt.dualGamma(S0=opt.S0, K=opt.K, vol=opt.vol, r=opt.r, T=opt.T, q=opt.q))))
                 
-                self.timeEvolutionAx.clear()
+                self.plot1ax.clear()
                 toSweep = {'S0' : (opt.S0*0.8, opt.S0*1.2, 50)}
                 toGrab = ('price')
                 fulltime.append(opt.sweep(toSweep, toGrab))
-                self.timeEvolutionAx.plot(fulltime[0]['S0'], self.sumprice(fulltime), label='Now')
+                self.plot1ax.plot(fulltime[0]['S0'], self.sumprice(fulltime), label='Now')
                 saveT = opt.T
                 opt.T /= 2
                 halftime.append(opt.sweep(toSweep, toGrab))
-                self.timeEvolutionAx.plot(halftime[0]['S0'], self.sumprice(halftime), label='Half Time')
+                self.plot1ax.plot(halftime[0]['S0'], self.sumprice(halftime), label='Half Time')
                 opt.T = 1e-6
                 expiry.append(opt.sweep(toSweep, toGrab))
                 opt.T = saveT
-                self.timeEvolutionAx.plot(expiry[0]['S0'], self.sumprice(expiry), label='Expiration')
-                self.timeEvolutionAx.set_xlabel('Stock Price')
-                self.timeEvolutionAx.set_ylabel('Option Price')
-                self.timeEvolutionAx.legend()
+                self.plot1ax.plot(expiry[0]['S0'], self.sumprice(expiry), label='Expiration')
+                self.plot1ax.set_xlabel('Stock Price')
+                self.plot1ax.set_ylabel('Option Price')
+                self.plot1ax.legend()
                 self.tab1.draw()
             
     def sumprice(self, outs):
@@ -348,7 +347,6 @@ class BlackScholesUI(QDialog):
                     price+=outs[i]['price']
                 elif outs[i]['ls'] == 'Short':
                     price-=outs[i]['price']
-        print(price)
         return price
     
     def sweepInput(self):
@@ -358,35 +356,144 @@ class BlackScholesUI(QDialog):
         minLabel = QLabel("Min")
         maxLabel = QLabel("Max")
         stepsLabel = QLabel("Steps")
-        inputSelect1 = QComboBox()
-        inputSelect2 = QComboBox()
-        min1 = QLineEdit()
-        min2 = QLineEdit()
-        max1 = QLineEdit()
-        max2 = QLineEdit()
-        steps1 = QLineEdit()
-        steps2 = QLineEdit()
+        inputs = ['None', 'Stock Price', 'Years to Expiration', 'Volatility', 'Dividend Yield', 'Risk Free Rate']
+        self.inputSelect1 = QComboBox()
+        self.inputSelect1.addItems(inputs)
+        self.inputSelect2 = QComboBox()
+        self.inputSelect2.addItems(inputs)
+        self.min1 = QLineEdit()
+        self.min2 = QLineEdit()
+        self.max1 = QLineEdit()
+        self.max2 = QLineEdit()
+        self.steps1 = QLineEdit()
+        self.steps2 = QLineEdit()
 
         self.inputBox = QGridLayout()
         self.inputBox.addWidget(toSweepLabel, 0, 0, 1, 1)
         self.inputBox.addWidget(minLabel, 0, 1, 1, 2)
         self.inputBox.addWidget(maxLabel, 0, 2, 1, 3)
         self.inputBox.addWidget(stepsLabel, 0, 3, 1, 4)
-        self.inputBox.addWidget(inputSelect1, 1, 0, 2, 1)
-        self.inputBox.addWidget(inputSelect2, 2, 0, 3, 1)
-        self.inputBox.addWidget(min1, 1, 1, 2, 2)
-        self.inputBox.addWidget(min2, 2, 1, 3, 2)
-        self.inputBox.addWidget(max1, 1, 2, 2, 3)
-        self.inputBox.addWidget(max2, 2, 2, 3, 3)
-        self.inputBox.addWidget(steps1, 1, 3, 2, 4)
-        self.inputBox.addWidget(steps2, 2, 3, 3, 4)
+        self.inputBox.addWidget(self.inputSelect1, 1, 0, 2, 1)
+        self.inputBox.addWidget(self.inputSelect2, 2, 0, 3, 1)
+        self.inputBox.addWidget(self.min1, 1, 1, 2, 2)
+        self.inputBox.addWidget(self.min2, 2, 1, 3, 2)
+        self.inputBox.addWidget(self.max1, 1, 2, 2, 3)
+        self.inputBox.addWidget(self.max2, 2, 2, 3, 3)
+        self.inputBox.addWidget(self.steps1, 1, 3, 2, 4)
+        self.inputBox.addWidget(self.steps2, 2, 3, 3, 4)
         
     def sweepOutput(self):
         self.outputSelectList = QListWidget()
         
         for i, out in enumerate(self.outputs):
             self.outputSelectList.insertItem(i, out)
+            
+        self.outputSelectList.setSelectionMode(1)
+        
+    def onPlotSweepButtonClicked(self):
+        toSweep = {}
+        if len(self.outputSelectList.selectedItems()) < 1: 
+            msgBox = QMessageBox()
+            msgBox.setIcon(QMessageBox.Information)
+            msgBox.setWindowTitle("Error")
+            msgBox.setText("Select At Least One Output")
+            msgBox.exec_()
+            return
+        toGrab = self.outputSelectList.selectedItems()
+        toGrab = [str(g.text()) for g in toGrab]
+        if str(self.inputSelect1.currentText()) == 'Stock Price': is1 = 'S0'
+        if str(self.inputSelect1.currentText()) =='Years to Expiration': is1 = 'T'
+        if str(self.inputSelect1.currentText()) =='Volatility': is1 = 'vol'
+        if str(self.inputSelect1.currentText()) =='Dividend Yield': is1 = 'q'
+        if str(self.inputSelect1.currentText()) =='Risk Free Rate': is1 = 'r'
+        if str(self.inputSelect2.currentText()) == 'Stock Price': is2 = 'S0'
+        if str(self.inputSelect2.currentText()) =='Years to Expiration': is2 = 'T'
+        if str(self.inputSelect2.currentText()) =='Volatility': is2 = 'vol'
+        if str(self.inputSelect2.currentText()) =='Dividend Yield': is2 = 'q'
+        if str(self.inputSelect2.currentText()) =='Risk Free Rate': is2 = 'r'
+        if str(self.inputSelect1.currentText()) != 'None' and bool(self.min1.text()) and bool(self.max1.text()) and bool(self.steps1.text()):
+            min1 = float(self.min1.text())
+            max1 = float(self.max1.text())
+            steps1 = int(self.steps1.text())
+            toSweep[is1] = (min1, max1, steps1)
+        if str(self.inputSelect2.currentText()) != 'None' and bool(self.min2.text()) and bool(self.max2.text()) and bool(self.steps2.text()):
+            min2 = float(self.min2.text())
+            max2 = float(self.max2.text())
+            steps2 = int(self.steps2.text())
+            toSweep[is2] = (min2, max2, steps2)
+        if len(toSweep) == 0:
+            msgBox = QMessageBox()
+            msgBox.setIcon(QMessageBox.Information)
+            msgBox.setWindowTitle("Error")
+            msgBox.setText("Select At Least One Input")
+            msgBox.exec_()
+            return
+        if len(self.selected) > 1 and toGrab[0] != 'price' or len(self.selected) > 1 and len(toGrab) > 1:
+            msgBox = QMessageBox()
+            msgBox.setIcon(QMessageBox.Information)
+            msgBox.setWindowTitle("Error")
+            msgBox.setText("Output Must be Only Price if More than One Option Selected")
+            msgBox.exec_()
+            return
 
+        if len(toSweep) == 1:
+            out = []
+            usedRows = []
+            self.tab2.figure.clf()
+            self.plot2ax = self.tab2.figure.add_subplot(111)
+            if len(self.selected) > 1:
+                for item in self.selected:
+                    if item.row() != 0 and item.row()<=len(self.optionsList) and item.row() not in usedRows:
+                        opt = self.optionsList[item.row()-1]
+                        usedRows.append(item.row())
+                        out.append(opt.sweep(toSweep, toGrab))
+                        self.plot2ax.clear()
+                        self.plot2ax.plot(out[0][is1], self.sumprice(out))
+                        self.plot2ax.set_xlabel(str(self.inputSelect1.currentText()))
+                        self.plot2ax.set_ylabel(str(toGrab[0]))
+                        self.tab2.draw()
+            else:
+                for item in self.selected:
+                    if item.row() != 0 and item.row()<=len(self.optionsList):
+                        opt = self.optionsList[item.row()-1]
+                        out = opt.sweep(toSweep, toGrab)
+                        self.plot2ax.clear()
+                        self.plot2ax.plot(out[is1], out[toGrab[0]])
+                        self.plot2ax.set_xlabel(str(self.inputSelect1.currentText()))
+                        self.plot2ax.set_ylabel(str(toGrab[0]))
+                        self.tab2.draw()
+        elif len(toSweep) == 2:
+            parula_map = LinearSegmentedColormap.from_list('parula', parula())
+            out = []
+            usedRows = []
+            self.tab2.figure.clf()
+            self.plot2ax = self.tab2.figure.add_subplot(111, projection='3d')
+            if len(self.selected) > 1:
+                for item in self.selected:
+                    if item.row() != 0 and item.row()<=len(self.optionsList) and item.row() not in usedRows:
+                        opt = self.optionsList[item.row()-1]
+                        usedRows.append(item.row())
+                        out.append(opt.sweep(toSweep, toGrab))
+                        self.plot2ax.clear()
+                        self.plot2ax.plot_surface(out[0][is1], out[0][is2], self.sumprice(out), cmap=parula_map)
+                        self.plot2ax.set_xlabel(str(self.inputSelect1.currentText()))
+                        self.plot2ax.set_ylabel(str(self.inputSelect2.currentText()))
+                        self.plot2ax.set_zlabel(str(toGrab[0]))
+                self.tab2.draw()
+            else:
+                for item in self.selected:
+                    if item.row() != 0 and item.row()<=len(self.optionsList):
+                        opt = self.optionsList[item.row()-1]
+                        out = opt.sweep(toSweep, toGrab)
+                        self.plot2ax.clear()
+                        self.plot2ax.plot_surface(out[is1], out[is2], out[toGrab[0]], cmap=parula_map)
+                        self.plot2ax.set_xlabel(str(self.inputSelect1.currentText()))
+                        self.plot2ax.set_ylabel(str(self.inputSelect2.currentText()))
+                        self.plot2ax.set_zlabel(str(toGrab[0]))
+                        self.tab2.draw()
+            
+                
+            
 if __name__ == '__main__':
 
     import sys
