@@ -5,17 +5,18 @@ from scipy import optimize
 from scipy import stats
 
 class option():
-    def __init__(self, otype, S0, K, q=0, marketPrice=None, T=None, expDay=None, vol=None, r=0.025):
+    def __init__(self, otype, S0, K, q=0, marketPrice=None, T=None, expDay=None, vol=None, r=0.025, ls='Long'):
         self.S0=S0
         self.K=K
         self.r=r
-        self.otype=otype.lower()
+        self.otype=otype.title()
         self.daysInYear = 252
         self.q=q
-        
+        self.ls = ls
         if T is None and expDay is None:
             print('Please enter days to expiry or expiration day')
         elif T is None:
+            self.expDayStr = expDay
             expDay = np.datetime64(expDay)
             nyse = mcal.get_calendar('NYSE')
             self.T= (np.busday_count(np.datetime64('today'), expDay, holidays=nyse.holidays().holidays)+1)/self.daysInYear
@@ -48,9 +49,9 @@ class option():
     def price(self, S0=None, K=None, vol=None, r=None, T=None, q=0):
         S0, K, vol, r, T, q = self.inpcheck(S0, K, vol, r, T, q)
         d1, d2 = self.d1d2(S0, K, vol, r, T, q)
-        if self.otype == 'call':
+        if self.otype == 'Call':
             return S0*np.exp(-q*T)*stats.norm.cdf(d1)-K*np.exp(-r*T)*stats.norm.cdf(d2)
-        elif self.otype == 'put':
+        elif self.otype == 'Put':
             return K*np.exp(-r*T)*stats.norm.cdf(-d2) - S0*np.exp(-q*T)*stats.norm.cdf(-d1)
     
     def IV(self):
@@ -72,9 +73,9 @@ class option():
     def delta(self, S0=None, K=None, vol=None, r=None, T=None, q=0): #dV/dS
         S0, K, vol, r, T, q = self.inpcheck(S0, K, vol, r, T, q)
         d1, d2 = self.d1d2(S0, K, vol, r, T, q)
-        if self.otype == 'call':
+        if self.otype == 'Call':
             return np.exp(-q*T)*stats.norm.cdf(d1)
-        elif self.otype == 'put':
+        elif self.otype == 'Put':
             return np.exp(-q*T)*stats.norm.cdf(-d1)
         
     def vega(self, S0=None, K=None, vol=None, r=None, T=None, q=0): #dV/dvol
@@ -85,17 +86,17 @@ class option():
     def theta(self, S0=None, K=None, vol=None, r=None, T=None, q=0): #-dV/dT
         S0, K, vol, r, T, q = self.inpcheck(S0, K, vol, r, T, q)
         d1, d2 = self.d1d2(S0, K, vol, r, T, q)
-        if self.otype == 'call':
+        if self.otype == 'Call':
             return -(np.exp(-q*T)*S0*stats.norm.pdf(d1)*vol)/(2*np.sqrt(T)) - r*K*np.exp(-r*T)*stats.norm.cdf(d2) + q*S0*np.exp(-q*T)*stats.norm.cdf(d1) 
-        elif self.otype == 'put':
+        elif self.otype == 'Put':
             return -(np.exp(-q*T)*S0*stats.norm.pdf(-d1)*vol)/(2*np.sqrt(T)) + r*K*np.exp(-r*T)*stats.norm.cdf(-d2) - q*S0*np.exp(-q*T)*stats.norm.cdf(-d1) 
     
     def rho(self, S0=None, K=None, vol=None, r=None, T=None, q=0): #dV.dr
         S0, K, vol, r, T, q = self.inpcheck(S0, K, vol, r, T, q)
         d1, d2 = self.d1d2(S0, K, vol, r, T, q)
-        if self.otype == 'call':
+        if self.otype == 'Call':
             return K*T*np.exp(-r*T)*stats.norm.cdf(d2)
-        elif self.otype == 'put':
+        elif self.otype == 'Put':
             return -K*T*np.exp(-r*T)*stats.norm.cdf(-d2)
         
     def omega(self, S0=None, K=None, vol=None, r=None, T=None, q=0): #aka lambda - leverage = dV/dS * S/V
@@ -115,9 +116,9 @@ class option():
     def charm(self, S0=None, K=None, vol=None, r=None, T=None, q=0): #-d^2V/dTdS
         S0, K, vol, r, T, q = self.inpcheck(S0, K, vol, r, T, q)
         d1, d2 = self.d1d2(S0, K, vol, r, T, q)
-        if self.otype == 'call':
+        if self.otype == 'Call':
             return q*np.exp(-q*T)*stats.norm.cdf(d1) - np.exp(-q*T)*stats.norm.pdf(d1)*((2*(r-q)*T - d2*vol*np.sqrt(T))/(2*T*vol*np.sqrt(T)))
-        elif self.otype == 'put':
+        elif self.otype == 'Put':
             return -q*np.exp(-q*T)*stats.norm.cdf(-d1) - np.exp(-q*T)*stats.norm.pdf(d1)*((2*(r-q)*T - d2*vol*np.sqrt(T))/(2*T*vol*np.sqrt(T)))
     
     def vomma(self, S0=None, K=None, vol=None, r=None, T=None, q=0): #d^2V/dvol^2
@@ -153,9 +154,9 @@ class option():
     def dualDelta(self, S0=None, K=None, vol=None, r=None, T=None, q=0): #dV/dK
         S0, K, vol, r, T, q = self.inpcheck(S0, K, vol, r, T, q)
         d1, d2 = self.d1d2(S0, K, vol, r, T, q)
-        if self.otype == 'call':
+        if self.otype == 'Call':
             return -np.exp(-r*T)*stats.norm.cdf(d2)
-        elif self.otype == 'put':
+        elif self.otype == 'Put':
             return -np.exp(-r*T)*stats.norm.cdf(-d2)
     
     def dualGamma(self, S0=None, K=None, vol=None, r=None, T=None, q=0): #d^2V/dK^2
@@ -169,7 +170,7 @@ class option():
         vectors = dict([(k, np.linspace(toSweep[k][0], toSweep[k][1], toSweep[k][2])) for k in toSweep])
         scalars = dict([(k, inps[k]) for k in inps if k not in vectors])
         if len(toSweep) == 1:
-            out = vectors.values[0]
+            out = np.array(list(vectors.values()))
         if len(toSweep) == 2:
             out = np.meshgrid(list(vectors.values())[0], list(vectors.values())[1])
         if len(toSweep) == 3:
@@ -198,4 +199,4 @@ class option():
         if 'dualDelta' in toGrab: out['dualDelta'] = self.dualDelta(*data)
         if 'dualGamma' in toGrab: out['dualGamma'] = self.dualGamma(*data)
         
-        return {**combined, **out}
+        return {**combined, **out, **{'ls': self.ls}}
