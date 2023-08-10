@@ -1,6 +1,5 @@
 # optionsVisualizer
 
-WIP 
 
 todo:  
 -implement matlab engine in py code when matlab engine is updated to python 3.8  
